@@ -11,7 +11,7 @@ const messageRoutes = require('./routes/messageRoutes');
 
 const app = express();
 const server = http.createServer(app);
-const clientOrigin = process.env.CLIENT_URL || 'http://localhost:8080';
+const clientOrigin = (process.env.CLIENT_URL || 'http://localhost:8080').replace(/\/$/, '');
 
 const io = new Server(server, {
   cors: {
