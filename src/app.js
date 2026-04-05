@@ -11,20 +11,35 @@ const messageRoutes = require('./routes/messageRoutes');
 
 const app = express();
 const server = http.createServer(app);
-const clientOrigin = (process.env.CLIENT_URL || 'http://localhost:8080').replace(/\/$/, '');
+const clientOrigins = (process.env.CLIENT_URLS || process.env.CLIENT_URL || 'http://localhost:8080')
+  .split(',')
+  .map((item) => item.trim().replace(/\/$/, ''))
+  .filter(Boolean);
+
+const isAllowedOrigin = (origin) => !origin || clientOrigins.includes(origin.replace(/\/$/, ''));
+const corsOptions = {
+  origin(origin, callback) {
+    if (isAllowedOrigin(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  credentials: true
+};
 
 const io = new Server(server, {
   cors: {
-    origin: clientOrigin,
+    origin: clientOrigins,
     credentials: true
   }
 });
 
-app.use(cors({ origin: clientOrigin, credentials: true }));
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-app.get('/api/health', (_, res) => res.json({ message: 'forum server running' }));
+app.get('/api/health', (_, res) => res.json({ message: 'forum server running', origins: clientOrigins }));
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/follows', followRoutes);
