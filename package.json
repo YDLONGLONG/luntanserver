@@ -4,7 +4,8 @@
   "private": true,
   "main": "src/app.js",
   "scripts": {
-    "dev": "nodemon src/app.js",
+    "dev": "dotenv -e .env.local -- nodemon src/app.js",
+    "dev:cloud": "dotenv -e .env.cloud -- nodemon src/app.js",
     "start": "node src/app.js"
   },
   "dependencies": {
@@ -12,6 +13,7 @@
     "cloudinary": "^2.5.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
+    "dotenv-cli": "^7.4.4",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "moment": "^2.30.1",
