@@ -19,7 +19,7 @@ function normalizeImageUrl(image) {
 }
 
 async function uploadImages(files) {
-  return Promise.all((files || []).map((file) => uploadBuffer(file.buffer)));
+  return Promise.all((files || []).map((file) => uploadBuffer(file.buffer, { originalname: file.originalname })));
 }
 
 async function buildPostItem(row, currentUserId) {
