@@ -16,5 +16,7 @@ router.delete('/account', auth, controller.deleteAccount);
 router.get('/security-questions', controller.getSecurityQuestions);
 router.get('/security-question', controller.getUserSecurityQuestion);
 router.post('/reset-password', controller.resetPassword);
+router.get('/my-posts', auth, controller.getMyPosts);
+router.get('/my-comments', auth, controller.getMyComments);
 
 module.exports = router;

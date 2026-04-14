@@ -276,3 +276,27 @@ exports.resetPassword = async (req, res) => {
     res.status(500).json({ message: '重置密码失败', error: error.message });
   }
 };
+
+exports.getMyPosts = async (req, res) => {
+  try {
+    const { getUserPosts } = require('../services/userService');
+    const page = Math.max(Number(req.query.page || 1), 1);
+    const limit = Math.min(Number(req.query.limit || 10), 20);
+    const data = await getUserPosts(req.user.id, page, limit);
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ message: '获取我的帖子失败', error: error.message });
+  }
+};
+
+exports.getMyComments = async (req, res) => {
+  try {
+    const { getUserComments } = require('../services/userService');
+    const page = Math.max(Number(req.query.page || 1), 1);
+    const limit = Math.min(Number(req.query.limit || 10), 20);
+    const data = await getUserComments(req.user.id, page, limit);
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ message: '获取我的评论失败', error: error.message });
+  }
+};

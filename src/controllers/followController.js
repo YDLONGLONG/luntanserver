@@ -22,15 +22,31 @@ exports.toggleFollow = async (req, res) => {
 
 exports.followingList = async (req, res) => {
   try {
+    const page = Math.max(Number(req.query.page || 1), 1);
+    const limit = Math.min(Number(req.query.limit || 10), 20);
+    const offset = (page - 1) * limit;
+    
     const [rows] = await pool.query(
       `SELECT u.id, u.nickname, u.avatar, u.bio, f.created_at
        FROM follows f
        JOIN users u ON u.id = f.following_id
        WHERE f.follower_id = ?
-       ORDER BY f.created_at DESC`,
+       ORDER BY f.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [req.user.id, limit, offset]
+    );
+    
+    const [[countRow]] = await pool.query(
+      'SELECT COUNT(*) AS total FROM follows WHERE follower_id = ?',
       [req.user.id]
     );
-    res.json(rows);
+    
+    res.json({
+      list: rows,
+      total: Number(countRow.total),
+      page,
+      limit
+    });
   } catch (error) {
     res.status(500).json({ message: '获取关注列表失败', error: error.message });
   }
@@ -38,15 +54,31 @@ exports.followingList = async (req, res) => {
 
 exports.fansList = async (req, res) => {
   try {
+    const page = Math.max(Number(req.query.page || 1), 1);
+    const limit = Math.min(Number(req.query.limit || 10), 20);
+    const offset = (page - 1) * limit;
+    
     const [rows] = await pool.query(
       `SELECT u.id, u.nickname, u.avatar, u.bio, f.created_at
        FROM follows f
        JOIN users u ON u.id = f.follower_id
        WHERE f.following_id = ?
-       ORDER BY f.created_at DESC`,
+       ORDER BY f.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [req.user.id, limit, offset]
+    );
+    
+    const [[countRow]] = await pool.query(
+      'SELECT COUNT(*) AS total FROM follows WHERE following_id = ?',
       [req.user.id]
     );
-    res.json(rows);
+    
+    res.json({
+      list: rows,
+      total: Number(countRow.total),
+      page,
+      limit
+    });
   } catch (error) {
     res.status(500).json({ message: '获取粉丝列表失败', error: error.message });
   }

@@ -31,6 +31,15 @@ async function getCurrentUserStats(userId) {
 async function getUserDashboard(userId) {
   const schema = await getCommentSchemaSupport();
   const [[user]] = await pool.query('SELECT * FROM users WHERE id = ?', [userId]);
+
+  return {
+    user: user ? formatUser(user) : null,
+    stats: await getCurrentUserStats(userId)
+  };
+}
+
+async function getUserPosts(userId, page = 1, limit = 10) {
+  const offset = (page - 1) * limit;
   const [posts] = await pool.query(
     `SELECT p.id, p.title, p.content, p.created_at,
       (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS commentCount,
@@ -38,37 +47,18 @@ async function getUserDashboard(userId) {
       (SELECT COUNT(*) FROM favorites f WHERE f.post_id = p.id) AS favoriteCount
      FROM posts p
      WHERE p.user_id = ?
-     ORDER BY p.created_at DESC`,
+     ORDER BY p.created_at DESC
+     LIMIT ? OFFSET ?`,
+    [userId, limit, offset]
+  );
+
+  const [[countRow]] = await pool.query(
+    'SELECT COUNT(*) AS total FROM posts WHERE user_id = ?',
     [userId]
   );
 
-  let comments = [];
-  if (schema.hasReplyToUserId && schema.hasParentId) {
-    [comments] = await pool.query(
-      `SELECT c.id, c.content, c.created_at, c.post_id, c.parent_id, c.reply_to_user_id,
-        p.title AS postTitle, ru.nickname AS replyToNickname
-       FROM comments c
-       JOIN posts p ON p.id = c.post_id
-       LEFT JOIN users ru ON ru.id = c.reply_to_user_id
-       WHERE c.user_id = ?
-       ORDER BY c.created_at DESC`,
-      [userId]
-    );
-  } else {
-    [comments] = await pool.query(
-      `SELECT c.id, c.content, c.created_at, c.post_id, p.title AS postTitle
-       FROM comments c
-       JOIN posts p ON p.id = c.post_id
-       WHERE c.user_id = ?
-       ORDER BY c.created_at DESC`,
-      [userId]
-    );
-  }
-
   return {
-    user: user ? formatUser(user) : null,
-    stats: await getCurrentUserStats(userId),
-    posts: posts.map((item) => ({
+    list: posts.map((item) => ({
       id: item.id,
       title: item.title,
       content: item.content,
@@ -77,7 +67,55 @@ async function getUserDashboard(userId) {
       likeCount: Number(item.likeCount || 0),
       favoriteCount: Number(item.favoriteCount || 0)
     })),
-    comments: comments.map((item) => ({
+    total: Number(countRow.total),
+    page,
+    limit
+  };
+}
+
+async function getUserComments(userId, page = 1, limit = 10) {
+  const schema = await getCommentSchemaSupport();
+  const offset = (page - 1) * limit;
+
+  let comments = [];
+  let countRow = { total: 0 };
+
+  if (schema.hasReplyToUserId && schema.hasParentId) {
+    [comments] = await pool.query(
+      `SELECT c.id, c.content, c.created_at, c.post_id, c.parent_id, c.reply_to_user_id,
+        p.title AS postTitle, ru.nickname AS replyToNickname
+       FROM comments c
+       JOIN posts p ON p.id = c.post_id
+       LEFT JOIN users ru ON ru.id = c.reply_to_user_id
+       WHERE c.user_id = ?
+       ORDER BY c.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [userId, limit, offset]
+    );
+
+    [[countRow]] = await pool.query(
+      'SELECT COUNT(*) AS total FROM comments WHERE user_id = ?',
+      [userId]
+    );
+  } else {
+    [comments] = await pool.query(
+      `SELECT c.id, c.content, c.created_at, c.post_id, p.title AS postTitle
+       FROM comments c
+       JOIN posts p ON p.id = c.post_id
+       WHERE c.user_id = ?
+       ORDER BY c.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [userId, limit, offset]
+    );
+
+    [[countRow]] = await pool.query(
+      'SELECT COUNT(*) AS total FROM comments WHERE user_id = ?',
+      [userId]
+    );
+  }
+
+  return {
+    list: comments.map((item) => ({
       id: item.id,
       content: item.content,
       createdAt: item.created_at,
@@ -86,8 +124,11 @@ async function getUserDashboard(userId) {
       parentId: schema.hasParentId ? item.parent_id : null,
       replyToUserId: schema.hasReplyToUserId ? item.reply_to_user_id : null,
       replyToNickname: schema.hasReplyToUserId ? item.replyToNickname : null
-    }))
+    })),
+    total: Number(countRow.total),
+    page,
+    limit
   };
 }
 
-module.exports = { getCurrentUserStats, getUserDashboard, getCommentSchemaSupport };
+module.exports = { getCurrentUserStats, getUserDashboard, getUserPosts, getUserComments, getCommentSchemaSupport };
