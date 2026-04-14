@@ -39,6 +39,7 @@ async function buildPostItem(row, currentUserId) {
     title: row.title,
     content: row.content,
     images,
+    views: Number(row.views || 0),
     createdAt: row.created_at,
     canManage: Number(currentUserId) === Number(row.user_id),
     author: {
@@ -296,5 +297,38 @@ exports.deleteComment = async (req, res) => {
     res.json({ message: '评论已删除' });
   } catch (error) {
     res.status(500).json({ message: '删除评论失败', error: error.message });
+  }
+};
+
+exports.incrementViews = async (req, res) => {
+  try {
+    await pool.query('UPDATE posts SET views = views + 1 WHERE id = ?', [req.params.id]);
+    res.json({ message: '浏览量+1' });
+  } catch (error) {
+    res.status(500).json({ message: '更新浏览量失败', error: error.message });
+  }
+};
+
+exports.getRecommended = async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit || 5), 10);
+    const currentUserId = Number(req.query.currentUserId || 0);
+    
+    const [rows] = await pool.query(
+      `SELECT p.*, u.nickname, u.avatar, u.bio,
+        (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS likeCount,
+        (SELECT COUNT(*) FROM favorites f WHERE f.post_id = p.id) AS favoriteCount,
+        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS commentCount
+      FROM posts p
+      JOIN users u ON u.id = p.user_id
+      ORDER BY p.views DESC, p.created_at DESC
+      LIMIT ?`,
+      [limit]
+    );
+
+    const data = await Promise.all(rows.map((row) => buildPostItem(row, currentUserId)));
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ message: '获取推荐帖子失败', error: error.message });
   }
 };
