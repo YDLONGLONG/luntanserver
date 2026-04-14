@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS users (
   nickname VARCHAR(50) NOT NULL,
   avatar VARCHAR(255) DEFAULT '',
   bio VARCHAR(255) DEFAULT '',
+  security_question VARCHAR(255) DEFAULT '',
+  security_answer VARCHAR(255) DEFAULT '',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

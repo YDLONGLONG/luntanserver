@@ -12,5 +12,9 @@ router.get('/dashboard', auth, controller.dashboard);
 router.put('/profile', auth, controller.updateProfile);
 router.put('/password', auth, controller.updatePassword);
 router.post('/avatar', auth, upload.single('avatar'), controller.uploadAvatar);
+router.delete('/account', auth, controller.deleteAccount);
+router.get('/security-questions', controller.getSecurityQuestions);
+router.get('/security-question', controller.getUserSecurityQuestion);
+router.post('/reset-password', controller.resetPassword);
 
 module.exports = router;

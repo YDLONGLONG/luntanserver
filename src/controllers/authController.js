@@ -6,7 +6,7 @@ const { getCurrentUserStats, getUserDashboard } = require('../services/userServi
 
 exports.register = async (req, res) => {
   try {
-    const { username, password, nickname } = req.body;
+    const { username, password, nickname, securityQuestion, securityAnswer } = req.body;
     if (!username || !password || !nickname) {
       return res.status(400).json({ message: '请填写完整信息' });
     }
@@ -17,9 +17,14 @@ exports.register = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    let hashedSecurityAnswer = '';
+    if (securityQuestion && securityAnswer) {
+      hashedSecurityAnswer = await bcrypt.hash(securityAnswer, 10);
+    }
+
     const [result] = await pool.query(
-      'INSERT INTO users (username, password, nickname, avatar, bio) VALUES (?, ?, ?, ?, ?)',
-      [username, hashedPassword, nickname, '', '欢迎来到知屿论坛']
+      'INSERT INTO users (username, password, nickname, avatar, bio, security_question, security_answer) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [username, hashedPassword, nickname, '', '欢迎来到知屿论坛', securityQuestion || '', hashedSecurityAnswer]
     );
 
     const [[user]] = await pool.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
@@ -167,5 +172,107 @@ exports.uploadAvatar = async (req, res) => {
     res.json({ message: '头像上传成功', user: formatUser(user), stats: await getCurrentUserStats(user.id) });
   } catch (error) {
     res.status(500).json({ message: '上传头像失败', error: error.message });
+  }
+};
+
+exports.deleteAccount = async (req, res) => {
+  try {
+    const { password } = req.body;
+    
+    if (!password) {
+      return res.status(400).json({ message: '请输入密码确认注销' });
+    }
+    
+    const [[user]] = await pool.query('SELECT * FROM users WHERE id = ?', [req.user.id]);
+    if (!user) {
+      return res.status(404).json({ message: '用户不存在' });
+    }
+    
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) {
+      return res.status(400).json({ message: '密码错误' });
+    }
+    
+    await pool.query('DELETE FROM users WHERE id = ?', [req.user.id]);
+    
+    res.json({ message: '账号已注销' });
+  } catch (error) {
+    res.status(500).json({ message: '注销账号失败', error: error.message });
+  }
+};
+
+const securityQuestions = [
+  '你童年最好的朋友叫什么名字？',
+  '你最喜欢的宠物叫什么名字？',
+  '你母亲的名字是什么？',
+  '你就读的第一所小学叫什么名字？',
+  '你最喜欢的电影是什么？'
+];
+
+exports.getSecurityQuestions = async (_, res) => {
+  try {
+    res.json(securityQuestions);
+  } catch (error) {
+    res.status(500).json({ message: '获取安全问题失败', error: error.message });
+  }
+};
+
+exports.getUserSecurityQuestion = async (req, res) => {
+  try {
+    const { username } = req.query;
+    
+    if (!username) {
+      return res.status(400).json({ message: '请输入用户名' });
+    }
+    
+    const [[user]] = await pool.query('SELECT security_question FROM users WHERE username = ?', [username]);
+    
+    if (!user) {
+      return res.status(404).json({ message: '用户不存在' });
+    }
+    
+    if (!user.security_question) {
+      return res.status(400).json({ message: '该用户未设置安全问题' });
+    }
+    
+    res.json({ question: user.security_question });
+  } catch (error) {
+    res.status(500).json({ message: '获取安全问题失败', error: error.message });
+  }
+};
+
+exports.resetPassword = async (req, res) => {
+  try {
+    const { username, answer, newPassword } = req.body;
+    
+    if (!username || !answer || !newPassword) {
+      return res.status(400).json({ message: '请填写完整信息' });
+    }
+    
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: '新密码至少6个字符' });
+    }
+    
+    const [[user]] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
+    
+    if (!user) {
+      return res.status(404).json({ message: '用户不存在' });
+    }
+    
+    if (!user.security_answer) {
+      return res.status(400).json({ message: '该用户未设置安全问题' });
+    }
+    
+    const validAnswer = await bcrypt.compare(answer, user.security_answer);
+    if (!validAnswer) {
+      return res.status(400).json({ message: '安全问题答案错误' });
+    }
+    
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await pool.query('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, user.id]);
+    
+    res.json({ message: '密码重置成功，请使用新密码登录' });
+  } catch (error) {
+    res.status(500).json({ message: '重置密码失败', error: error.message });
   }
 };
