@@ -72,6 +72,10 @@ exports.list = async (req, res) => {
   try {
     const keyword = req.query.keyword || '';
     const currentUserId = Number(req.query.currentUserId || 0);
+    const page = Math.max(Number(req.query.page || 1), 1);
+    const limit = Math.min(Number(req.query.limit || 10), 20);
+    const offset = (page - 1) * limit;
+    
     const [rows] = await pool.query(
       `SELECT p.*, u.nickname, u.avatar, u.bio,
         (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS likeCount,
@@ -80,12 +84,13 @@ exports.list = async (req, res) => {
       FROM posts p
       JOIN users u ON u.id = p.user_id
       WHERE p.title LIKE ? OR p.content LIKE ?
-      ORDER BY p.created_at DESC`,
-      [`%${keyword}%`, `%${keyword}%`]
+      ORDER BY p.created_at DESC
+      LIMIT ? OFFSET ?`,
+      [`%${keyword}%`, `%${keyword}%`, limit, offset]
     );
 
     const data = await Promise.all(rows.map((row) => buildPostItem(row, currentUserId)));
-    res.json(data);
+    res.json({ list: data, page, limit, hasMore: data.length === limit });
   } catch (error) {
     res.status(500).json({ message: '获取帖子失败', error: error.message });
   }
